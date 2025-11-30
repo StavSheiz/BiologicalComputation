@@ -31,7 +31,7 @@ CLOUD_LABELS = ['No Cloud', 'Cloud', 'Rain Cloud']
 
 # Simulation Parameters
 INITIAL_PARAMS = {
-    'Glacier_Start_T': 5, 'City_Pollution_Start': 50, 'Global_T_Base': 15,
+    'Glacier_Start_T': 5, 'City_Pollution_Start': 30, 'Global_T_Base': 15,
     'Glacier_T_Threshold': 30,  # RULE 1
     'Pollution_T_Threshold': 60,  # RULE 2
     'Pollution_Spread_T': 20,  # RULE 3
@@ -54,13 +54,13 @@ initial_grid_state = None
 
 def initialize_grid(size, params):
     """Initializes the multi-layered grid for the state using NumPy."""
-    L = np.zeros((size, size), dtype=np.int8)
-    T = np.full((size, size), params['Global_T_Base'], dtype=np.int8)
-    H = np.random.choice(np.arange(-500, 3100, 100), size=(size, size)).astype(np.int16)
-    P = np.zeros((size, size), dtype=np.int8)
-    C = np.zeros((size, size), dtype=np.int8)
-    W_dir = np.random.randint(1, 5, size=(size, size), dtype=np.int8)
-    W_int = np.random.randint(1, 11, size=(size, size), dtype=np.int8)
+    L = np.zeros((size, size), dtype=np.int8) # Land type
+    T = np.full((size, size), params['Global_T_Base'], dtype=np.int8) # Temperature
+    H = np.random.choice(np.arange(-500, 3100, 100), size=(size, size)).astype(np.int16) # Height
+    P = np.zeros((size, size), dtype=np.int8) # Pollution
+    C = np.zeros((size, size), dtype=np.int8)  # Clouds
+    W_dir = np.random.randint(1, 5, size=(size, size), dtype=np.int8) # Wind direction
+    W_int = np.random.randint(1, 11, size=(size, size), dtype=np.int8) # Wind intensity
 
     L[:] = LAND_CODES['Land']
     sea_mask = (H < -100) | (np.random.rand(size, size) < 0.2)
@@ -99,7 +99,6 @@ def simulate_step(current_grid, params):
     C_out = np.zeros((R, C), dtype=np.int8)
 
     # --- Step 1: LOCAL STATE CHANGES (Rules 1, 2, 6, 8, 9) ---
-    # Rule 11 (High Altitude Rain) removed here.
 
     # R1: Melting Glaciers: If T > 30 and L = Glacier -> L = Land
     melt_mask = (current_grid['T'] > params['Glacier_T_Threshold']) & (current_grid['L'] == LAND_CODES['Glacier'])
@@ -121,16 +120,16 @@ def simulate_step(current_grid, params):
     forest_mask = current_grid['L'] == LAND_CODES['Forest']
     P_out[forest_mask] = np.maximum(0, current_grid['P'][forest_mask] - 1)
 
-    # R11 logic removed: High Altitude Makes Cloud Rainy: If C = 1 and H > 2000 -> C = 2
-
     # --- Step 2: SPATIAL PROPAGATION (Rules 3, 4 - Go over neighbours) ---
 
     # Mask used for R5: Tracks cells that are sources for wind-driven movement.
     wind_cleared_cloud_mask = (current_grid['C'] >= 1) & (current_grid['W_int'] > 0)
 
+    # for each cell
     for r in range(R):
         for c in range(C):
 
+            # for each neighbour
             for direction in range(1, 5):
                 # Calculate the neighbor coordinates (r_n, c_n) which is the source cell
                 dr, dc = WIND_VECTORS[direction]
